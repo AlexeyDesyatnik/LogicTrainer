@@ -1,0 +1,666 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Законы логики — тренажёр</title>
+<style>
+:root{
+  --bg:#f6f5f1; --card:#fff; --ink:#1f2328; --muted:#6b6f76; --line:#e2e0da;
+  --accent:#2f5d50; --accent-ink:#fff;
+  --good:#1f7a4d; --good-bg:#e7f4ec; --bad:#b3261e; --bad-bg:#fbeaea; --hint:#6a4c00; --hint-bg:#fff6dc;
+  --a:#1d4ed8; --a-bg:#dbe7ff; --b:#a8550b; --b-bg:#fde9cc;
+  --math:"Cambria Math","Cambria","STIX Two Math","Times New Roman",serif;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:17px/1.5 "Segoe UI",Roboto,Arial,sans-serif}
+header{background:var(--card);border-bottom:1px solid var(--line)}
+.top{max-width:860px;margin:0 auto;padding:14px 16px 0;display:flex;flex-wrap:wrap;align-items:flex-end;gap:8px 24px}
+h1{font-size:20px;margin:0 0 12px;font-weight:600}
+nav{display:flex;gap:4px}
+.tab{border:0;background:none;font:inherit;padding:8px 14px 10px;border-bottom:3px solid transparent;color:var(--muted);cursor:pointer}
+.tab.on{color:var(--ink);border-bottom-color:var(--accent);font-weight:600}
+main{max-width:860px;margin:0 auto;padding:20px 16px 60px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:22px 24px;margin-top:14px}
+.intro{background:#eef3f1;border-left:4px solid var(--accent);padding:12px 16px;border-radius:6px;margin-top:14px}
+.task-no{color:var(--muted);font-size:14px}
+.q{margin:8px 0 6px}
+.progress{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.seg{border:0;background:none;padding:0;text-align:left;cursor:pointer;font:inherit;color:var(--muted)}
+.seg.cur{color:var(--ink);font-weight:600}
+.seg-label{display:block;font-size:14px;margin-bottom:4px}
+.seg-track{display:block;height:6px;background:var(--line);border-radius:3px;overflow:hidden}
+.seg-fill{display:block;height:100%;background:var(--accent)}
+/* выражения */
+.expr{font-family:var(--math);font-size:26px;margin:10px 0;line-height:1.7}
+.expr.big{font-size:36px;margin:18px 0}
+.inline{display:inline;font-family:var(--math)}
+.law{display:flex;flex-wrap:wrap;align-items:baseline;gap:0 .2em;font-size:26px}
+.eq{padding:0 .35em}
+.tok{display:inline-block;padding:0 .06em;border-radius:3px;position:relative}
+.tok.bin{padding:0 .3em}
+.c-A{background:var(--a-bg);color:var(--a)} .c-B{background:var(--b-bg);color:var(--b)}
+.chip{display:inline-block;font-family:var(--math);font-weight:700;padding:0 .45em;border-radius:4px}
+.clickable{cursor:pointer;color:var(--accent);outline:2px dashed #b9c9c3;outline-offset:-1px;margin:0 .1em}
+.clickable:hover{background:#e4eeea}
+.clickable.done{color:var(--good);outline:0;cursor:default;background:var(--good-bg)}
+.badge{position:absolute;top:-.55em;right:-.35em;font:600 13px/20px "Segoe UI",Arial,sans-serif;min-width:20px;height:20px;text-align:center;border-radius:10px;background:var(--good);color:#fff}
+.selectable{user-select:none;-webkit-user-select:none;touch-action:none;cursor:text}
+.selectable .tok.sel{background:#d5d8dd;color:var(--ink)}
+.tok.ghost{outline:2px dashed var(--muted);outline-offset:1px}
+/* кнопки */
+button{font:inherit}
+.primary{background:var(--accent);color:var(--accent-ink);border:0;border-radius:8px;padding:10px 20px;cursor:pointer;margin-top:12px}
+.primary:hover{filter:brightness(1.1)}
+.secondary{background:none;border:1px solid var(--line);border-radius:8px;padding:8px 16px;cursor:pointer;color:var(--ink)}
+.secondary:hover{background:#f0efea}
+.small{font-size:15px;padding:5px 12px}
+.row{margin-top:6px}
+.choices{display:flex;flex-wrap:wrap;gap:10px;margin:6px 0 12px}
+.choice{font-family:var(--math);font-size:26px;min-width:110px;padding:8px 18px;border:2px solid var(--line);background:var(--card);border-radius:10px;cursor:pointer}
+.choice:hover:not(:disabled){border-color:var(--accent)}
+.choice.right{border-color:var(--good);background:var(--good-bg)}
+.choice.wrong{border-color:var(--bad);background:var(--bad-bg);opacity:.75}
+.choice.reveal{border-color:var(--good);border-style:dashed}
+.choice:disabled{cursor:default;color:var(--ink)}
+.c-A,.c-B{border-radius:0}
+/* сообщения */
+.msg{min-height:0;margin-top:10px}
+.msg.good,.msg.bad,.msg.hint{padding:10px 14px;border-radius:8px}
+.msg.good{background:var(--good-bg);color:var(--good)}
+.msg.bad{background:var(--bad-bg);color:var(--bad)}
+.msg.hint{background:var(--hint-bg);color:var(--hint)}
+.hintline{background:var(--hint-bg);color:var(--hint);padding:8px 14px;border-radius:8px;margin:10px 0 4px}
+.note{color:var(--muted)}
+.after:empty{display:none}
+.after{margin-top:6px}
+.shake{animation:sh .3s}
+@keyframes sh{25%{transform:translateX(-4px)}75%{transform:translateX(4px)}}
+.done-card h2{margin-top:0}
+/* проверка */
+.lbl{display:block;font-size:14px;color:var(--muted);margin-top:12px}
+.in{width:100%;font-family:var(--math);font-size:24px;padding:8px 12px;border:1px solid #cfccc4;border-radius:8px;margin-top:4px}
+.in:focus{outline:2px solid var(--accent);border-color:transparent}
+.err{color:var(--bad);font-size:15px;margin-top:4px}
+.err code{font-family:var(--math);font-size:20px;white-space:pre}
+.err mark{background:var(--bad);color:#fff;border-radius:2px}
+.kb{display:flex;gap:8px;margin-top:12px}
+.key{font-family:var(--math);font-size:24px;width:52px;height:46px;border:1px solid var(--line);background:#faf9f6;border-radius:8px;cursor:pointer}
+.key:hover{background:#efeee9}
+.tip{font-size:14px;color:var(--muted)}
+.small-note{color:var(--muted);font-size:14px;margin:16px 0 0}
+details{margin-top:12px} summary{cursor:pointer;color:var(--accent)}
+table.tt{border-collapse:collapse;margin-top:8px;font-family:var(--math);font-size:19px}
+.tt th,.tt td{border:1px solid var(--line);padding:3px 14px;text-align:center}
+.tt th{font-family:"Segoe UI",Arial,sans-serif;font-size:14px;background:#f3f2ee}
+.tt tr.diff td{background:var(--bad-bg);color:var(--bad)}
+/* законы */
+.tblwrap{overflow-x:auto}
+table.laws{border-collapse:collapse;width:100%}
+.laws th,.laws td{border:1px solid var(--line);padding:7px 10px}
+.laws th{background:#f3f2ee;font-weight:600}
+.laws td.m{font-family:var(--math);font-size:19px;text-align:center;white-space:nowrap}
+@media (max-width:600px){
+  .card{padding:16px} .expr.big{font-size:28px} .progress{grid-template-columns:1fr} 
+}
+</style>
+</head>
+<body>
+<header><div class="top">
+  <h1>Законы алгебры логики</h1>
+  <nav><button class="tab" data-t="train">Тренажёр</button><button class="tab" data-t="check">Проверь себя</button><button class="tab" data-t="laws">Законы</button></nav>
+</div></header>
+<main>
+  <section class="page" id="train"></section>
+  <section class="page" id="check" hidden></section>
+  <section class="page" id="laws" hidden></section>
+</main>
+<script>
+// ===== Ядро: разбор, вычисление, печать, сопоставление с законом =====
+const PREC = { or: 1, and: 2, not: 3, var: 4, const: 4 };
+const SYM = { or: '∨', and: '∧', not: '¬' };
+
+class ParseError extends Error {
+  constructor(msg, pos) { super(msg); this.pos = pos; }
+}
+
+const CYR = { 'А':'A','В':'B','С':'C','Е':'E','К':'K','М':'M','Н':'H','О':'O','Р':'P','Т':'T','Х':'X',
+              'а':'A','в':'B','с':'C','е':'E','к':'K','м':'M','н':'H','о':'O','р':'P','т':'T','х':'X' };
+const WORDS = { 'не':'not', 'not':'not', 'и':'and', 'and':'and', 'или':'or', 'or':'or' };
+const LETTER = /[A-Za-zА-Яа-яЁё]/;
+
+function tokenize(s) {
+  const t = []; let i = 0;
+  while (i < s.length) {
+    const c = s[i];
+    if (/\s/.test(c)) { i++; continue; }
+    if (c === '(' || c === ')') { t.push({ k: c, pos: i }); i++; continue; }
+    if ('¬!~'.includes(c)) { t.push({ k: 'not', pos: i }); i++; continue; }
+    if ('∧&*·'.includes(c)) { t.push({ k: 'and', pos: i }); i++; continue; }
+    if ('∨|+'.includes(c)) { t.push({ k: 'or', pos: i }); i++; continue; }
+    if (c === '0' || c === '1') { t.push({ k: 'const', v: +c, pos: i }); i++; continue; }
+    if (LETTER.test(c)) {
+      let j = i; while (j < s.length && LETTER.test(s[j])) j++;
+      const w = s.slice(i, j), lw = w.toLowerCase();
+      if (WORDS[lw]) t.push({ k: WORDS[lw], pos: i });
+      else if (w.length === 1) {
+        const L = /[A-Za-z]/.test(w) ? w.toUpperCase() : CYR[w];
+        if (!L) throw new ParseError(`Буква «${w}»: используй латинские буквы A, B, C…`, i);
+        t.push({ k: 'var', n: L, pos: i });
+      } else if (/^[A-Za-z]+$/.test(w)) {
+        throw new ParseError(`Между буквами в «${w}» пропущен знак операции`, i);
+      } else throw new ParseError(`Непонятное слово «${w}»`, i);
+      i = j; continue;
+    }
+    throw new ParseError(`Непонятный символ «${c}»`, i);
+  }
+  return t;
+}
+
+function parse(s) {
+  const t = tokenize(s); let p = 0; const end = s.length;
+  if (!t.length) throw new ParseError('Выражение пустое', 0);
+  const peek = () => t[p];
+  const posOf = () => (p < t.length ? t[p].pos : end);
+  function or() { let a = and(); while (peek() && peek().k === 'or') { p++; a = { t: 'or', a, b: and() }; } return a; }
+  function and() { let a = not(); while (peek() && peek().k === 'and') { p++; a = { t: 'and', a, b: not() }; } return a; }
+  function not() { if (peek() && peek().k === 'not') { p++; return { t: 'not', a: not() }; } return atom(); }
+  function atom() {
+    const k = peek();
+    if (!k) throw new ParseError('Выражение обрывается: не хватает буквы или скобки', end);
+    if (k.k === 'var') { p++; return { t: 'var', n: k.n }; }
+    if (k.k === 'const') { p++; return { t: 'const', v: k.v }; }
+    if (k.k === '(') {
+      p++; const e = or();
+      if (!peek() || peek().k !== ')') throw new ParseError('Не хватает закрывающей скобки «)»', posOf());
+      p++; return e;
+    }
+    if (k.k === ')') throw new ParseError('Лишняя закрывающая скобка или пустые скобки', k.pos);
+    throw new ParseError(`Знак «${SYM[k.k]}» стоит не на месте: здесь должна быть буква или выражение`, k.pos);
+  }
+  const e = or();
+  if (p < t.length) {
+    const k = t[p];
+    if (k.k === ')') throw new ParseError('Лишняя закрывающая скобка «)»', k.pos);
+    throw new ParseError('Здесь пропущен знак операции', k.pos);
+  }
+  return e;
+}
+
+function ev(n, env) {
+  switch (n.t) {
+    case 'var': return env[n.n];
+    case 'const': return n.v;
+    case 'not': return 1 - ev(n.a, env);
+    case 'and': return ev(n.a, env) & ev(n.b, env);
+    case 'or': return ev(n.a, env) | ev(n.b, env);
+  }
+}
+function varsOf(n, s = new Set()) {
+  if (n.t === 'var') s.add(n.n);
+  else if (n.a) { varsOf(n.a, s); if (n.b) varsOf(n.b, s); }
+  return s;
+}
+function equal(x, y) {
+  if (x.t !== y.t) return false;
+  if (x.t === 'var') return x.n === y.n;
+  if (x.t === 'const') return x.v === y.v;
+  return equal(x.a, y.a) && (x.t === 'not' || equal(x.b, y.b));
+}
+function compare(e1, e2) {
+  const vs = [...new Set([...varsOf(e1), ...varsOf(e2)])].sort();
+  const rows = []; let diff = null;
+  for (let m = 0; m < 1 << vs.length; m++) {
+    const env = {}; vs.forEach((v, i) => env[v] = (m >> (vs.length - 1 - i)) & 1);
+    const r = { env, a: ev(e1, env), b: ev(e2, env) };
+    rows.push(r); if (r.a !== r.b && !diff) diff = r;
+  }
+  return { vars: vs, rows, diff };
+}
+
+// Нужны ли скобки вокруг child внутри parent
+function needParens(child, parent, isRight) {
+  if (parent.t === 'not') return PREC[child.t] < 3;
+  const pc = PREC[child.t], pp = PREC[parent.t];
+  return pc < pp || (isRight && pc === pp);
+}
+// Печать в список токенов. opts: {full, colors: Map(node->name), ranges: []}
+function emit(n, out, opts, parent, isRight, color) {
+  const paren = parent && (needParens(n, parent, isRight) || (opts.full && n.t !== 'var' && n.t !== 'const'));
+  if (opts.colors && opts.colors.has(n)) color = opts.colors.get(n);
+  const ps = out.length;
+  if (paren) out.push({ s: '(', k: '(', color });
+  const s = out.length;
+  if (n.t === 'var') out.push({ s: n.n, k: 'var', node: n, color });
+  else if (n.t === 'const') out.push({ s: String(n.v), k: 'const', node: n, color });
+  else if (n.t === 'not') { out.push({ s: '¬', k: 'op', node: n, color }); emit(n.a, out, opts, n, false, color); }
+  else {
+    emit(n.a, out, opts, n, false, color);
+    out.push({ s: SYM[n.t], k: 'op', node: n, color, bin: true });
+    emit(n.b, out, opts, n, true, color);
+  }
+  const e = out.length - 1;
+  if (paren) out.push({ s: ')', k: ')', color });
+  if (opts.ranges) opts.ranges.push({ node: n, s, e, ps, pe: out.length - 1 });
+  return out;
+}
+const tokensOf = (n, opts = {}) => emit(n, [], opts, null, false, undefined);
+const toStr = (n, opts = {}) => tokensOf(n, opts).map(t => (t.bin ? ' ' + t.s + ' ' : t.s)).join('');
+
+// Сопоставление с образцом закона
+function match(pat, n, bind = {}, occ = {}) {
+  if (pat.t === 'var') {
+    const v = pat.n;
+    if (bind[v]) { if (!equal(bind[v], n)) return null; } else bind[v] = n;
+    (occ[v] = occ[v] || []).push(n);
+    return { bind, occ };
+  }
+  if (pat.t !== n.t) return null;
+  if (pat.t === 'const') return pat.v === n.v ? { bind, occ } : null;
+  if (!match(pat.a, n.a, bind, occ)) return null;
+  if (pat.b && !match(pat.b, n.b, bind, occ)) return null;
+  return { bind, occ };
+}
+function findMatch(pat, n) {
+  const r = match(pat, n, {}, {}); if (r) return r;
+  if (n.a) { const x = findMatch(pat, n.a); if (x) return x; }
+  if (n.b) return findMatch(pat, n.b);
+  return null;
+}
+function subst(pat, bind) {
+  if (pat.t === 'var') return bind[pat.n];
+  if (pat.t === 'const') return pat;
+  return pat.b ? { t: pat.t, a: subst(pat.a, bind), b: subst(pat.b, bind) } : { t: pat.t, a: subst(pat.a, bind) };
+}
+
+// Порядок действий: можно ли выполнить операцию n сейчас
+const isOp = n => n && PREC[n.t] < 4;
+function orderCheck(n, done) {
+  const pend = [n.a, n.b].find(c => isOp(c) && !done.has(c));
+  if (!pend) return null;
+  if (needParens(pend, n, pend === n.b)) return 'Сначала выполняется то, что в скобках.';
+  if (pend.t === 'not' && n.t === 'not') return 'Сначала выполняется отрицание, которое стоит ближе к букве.';
+  if (pend.t === 'not') return `Отрицание ¬ выполняется раньше, чем ${SYM[n.t]}.`;
+  if (pend.t === 'and' && n.t === 'or') return '∧ выполняется раньше ∨ — как умножение раньше сложения.';
+  return 'Одинаковые операции выполняются по порядку, слева направо.';
+}
+
+// ===== Задания =====
+const LAWS = {
+  dneg:      { name: 'двойного отрицания',      l: '¬¬A',         r: 'A' },
+  excl_or:   { name: 'исключённого третьего',   l: 'A ∨ ¬A',      r: '1' },
+  excl_and:  { name: 'исключённого третьего',   l: 'A ∧ ¬A',      r: '0' },
+  const_and: { name: 'операции с константами',  l: 'A ∧ 1',       r: 'A' },
+  const_or:  { name: 'операции с константами',  l: 'A ∨ 0',       r: 'A' },
+  abs_or:    { name: 'поглощения',              l: 'A ∨ A ∧ B',   r: 'A' },
+  abs_and:   { name: 'поглощения',              l: 'A ∧ (A ∨ B)', r: 'A' },
+  dm_and:    { name: 'де Моргана',              l: '¬(A ∧ B)',    r: '¬A ∨ ¬B' },
+  dm_or:     { name: 'де Моргана',              l: '¬(A ∨ B)',    r: '¬A ∧ ¬B' },
+};
+
+const ORDER_TASKS = [
+  'A ∨ B ∧ C',
+  '¬A ∧ B',
+  'A ∧ B ∨ ¬C',
+  '(A ∨ B) ∧ ¬C',
+  '¬(A ∧ B) ∨ C ∧ ¬A',
+  'A ∨ ¬B ∧ (C ∨ A)',
+];
+
+const ROLE_TASKS = [
+  { law: 'excl_or', expr: 'C ∨ ¬C',
+    hint: 'Сравни: слева от ∨ стоит то же самое, что справа под отрицанием.' },
+  { law: 'excl_and', expr: '¬B ∧ ¬¬B',
+    hint: 'Роль A может играть не только буква. Справа от ∧ стоит отрицание от ¬B.' },
+  { law: 'abs_or', expr: 'B ∨ B ∧ C',
+    hint: 'В законе A стоит дважды: в самом начале и перед ∧. Какая буква стоит на этих местах в выражении?' },
+  { law: 'abs_and', expr: '(A ∨ C) ∧ (A ∨ C ∨ B)',
+    hint: 'A ∨ C ∨ B читается как (A ∨ C) ∨ B. Значит, во второй скобке повторяется то, что стоит в первой.' },
+  { law: 'dm_and', expr: '¬(¬C ∧ B)',
+    hint: 'Посмотри, что стоит в скобках слева от ∧ и справа от ∧.',
+    note: 'А ¬¬C = C по закону двойного отрицания, поэтому окончательно получаем C ∨ ¬B.' },
+  { law: 'dm_or', expr: '¬(A ∧ C ∨ B)',
+    hint: '∧ выполняется раньше ∨, поэтому в скобках стоит (A ∧ C) ∨ B. Что слева от ∨?' },
+  { law: 'abs_or', expr: '¬A ∧ B ∨ ¬A ∧ B ∧ C',
+    hint: '¬A ∧ B ∧ C читается как (¬A ∧ B) ∧ C. Найди кусок, который повторяется.' },
+];
+
+const STEP_TASKS = [
+  { expr: '¬¬C', law: 'dneg', ok: 'C', wrong: [
+    ['¬C', 'Отрицаний два, а не одно. Два отрицания отменяют друг друга.'],
+    ['0', 'Ноль тут ни при чём: ¬¬C всегда равно C.'] ] },
+  { expr: 'B ∨ ¬B', law: 'excl_or', ok: '1', wrong: [
+    ['0', '0 получается в B ∧ ¬B, при «И». А при «ИЛИ» одно из двух, B или ¬B, всегда истинно.'],
+    ['B', 'Проверь при B = 0: тогда ¬B = 1, и всё выражение равно 1.'] ] },
+  { expr: 'A ∧ 1', law: 'const_and', ok: 'A', wrong: [
+    ['1', '1 получается в A ∨ 1. А при «И» единица ничего не меняет — как умножение на 1.'],
+    ['0', '0 получается в A ∧ 0. А здесь «И» с единицей.'] ] },
+  { expr: 'C ∨ 0', law: 'const_or', ok: 'C', wrong: [
+    ['0', 'При «ИЛИ» ноль ничего не добавляет — как прибавить 0. Результат зависит только от C.'],
+    ['1', '1 получилось бы в C ∨ 1. А здесь «ИЛИ» с нулём.'] ] },
+  { expr: 'B ∧ (B ∨ C)', law: 'abs_and', ok: 'B', wrong: [
+    ['B ∨ C', 'Здесь работает закон поглощения: всё выражение равно просто B.'],
+    ['B ∧ C', 'Скобку раскрывать не нужно: по закону поглощения всё выражение равно B.'] ] },
+  { expr: '¬(A ∧ C)', law: 'dm_and', ok: '¬A ∨ ¬C', wrong: [
+    ['¬A ∧ ¬C', 'Почти! При раскрытии скобки знак ∧ меняется на ∨.'],
+    ['¬A ∧ C', 'Отрицание действует на обе буквы, и знак операции тоже меняется.'] ] },
+  { expr: '¬(B ∨ ¬C)', law: 'dm_or', ok: '¬B ∧ C', note: 'И ещё ¬¬C = C по закону двойного отрицания.', wrong: [
+    ['¬B ∨ C', 'При раскрытии скобки знак ∨ меняется на ∧.'],
+    ['¬B ∧ ¬C', 'Под отрицанием уже было ¬C, а ¬¬C = C.'] ] },
+  { expr: 'A ∧ B ∨ ¬(A ∧ B)', law: 'excl_or', ok: '1', wrong: [
+    ['0', 'Здесь «ИЛИ» между выражением и его отрицанием. Одно из них всегда истинно, значит это 1.'],
+    ['A ∧ B', 'Роль A здесь играет всё A ∧ B. По закону исключённого третьего получается 1.'] ] },
+  { expr: '¬C ∨ ¬C ∧ A', law: 'abs_or', ok: '¬C', wrong: [
+    ['¬C ∧ A', 'Закон поглощения: всё выражение равно первой части, ¬C.'],
+    ['A', 'Поглощается не ¬C, а ¬C ∧ A. Остаётся ¬C.'] ] },
+  { expr: '¬¬(A ∨ C) ∧ B', law: 'dneg', ok: '(A ∨ C) ∧ B', wrong: [
+    ['A ∨ C ∧ B', 'Скобки терять нельзя: без них ∧ выполнится раньше ∨, и смысл изменится.'],
+    ['¬(A ∨ C) ∧ B', 'Отрицаний было два — они отменяют друг друга полностью.'] ] },
+];
+
+// ===== Интерфейс =====
+const $ = (s, r = document) => r.querySelector(s);
+function h(tag, attrs, ...kids) {
+  const e = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs || {})) {
+    if (k === 'class') e.className = v;
+    else if (k.startsWith('on')) e.addEventListener(k.slice(2), v);
+    else if (v !== false && v != null) e.setAttribute(k, v === true ? '' : v);
+  }
+  for (const c of kids.flat()) { if (c == null || c === false) continue; e.append(c.nodeType ? c : document.createTextNode(c)); }
+  return e;
+}
+function exprEl(tokens, cls = 'expr') {
+  const box = h('div', { class: cls });
+  tokens.forEach((t, i) => box.append(h('span', {
+    class: 'tok' + (t.bin ? ' bin' : '') + (t.k === 'op' ? ' op' : '') + (t.color ? ' c-' + t.color : ''), 'data-i': i }, t.s)));
+  return box;
+}
+const exprOf = (s, cls) => exprEl(tokensOf(parse(s)), cls);
+// Закон с раскрашенными буквами
+function lawEl(law, cls = 'expr law') {
+  const paint = toks => toks.map(t => (t.k === 'var' ? { ...t, color: t.s } : t));
+  const box = h('div', { class: cls });
+  const l = exprEl(paint(tokensOf(parse(law.l))), 'inline'), r = exprEl(paint(tokensOf(parse(law.r))), 'inline');
+  box.append(l, h('span', { class: 'eq' }, '='), r);
+  return box;
+}
+function setMsg(el, text, kind) { el.className = 'msg ' + (kind || ''); el.textContent = text; }
+function shake(el) { el.classList.remove('shake'); void el.offsetWidth; el.classList.add('shake'); }
+const nextBtn = () => { const b = h('button', { class: 'primary', onclick: next }, 'Дальше →'); setTimeout(() => b.focus(), 0); return b; };
+function shuffle(a) { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
+
+// ----- Состояние и навигация -----
+const SECS = [
+  { title: 'Порядок действий', tasks: ORDER_TASKS, render: renderOrder,
+    intro: 'Выражение вычисляется по шагам: сначала то, что в скобках, потом ¬, потом ∧, и в конце ∨. Нажимай на знаки операций в том порядке, в каком они выполняются.' },
+  { title: 'Роль A и B', tasks: ROLE_TASKS, render: renderRole,
+    intro: 'Чтобы применить закон, нужно понять, что в выражении играет роль букв A и B из закона. Роль буквы может играть целое выражение! Выдели нужный кусок: зажми кнопку мыши на первом символе и протяни до последнего.' },
+  { title: 'Один шаг', tasks: STEP_TASKS, render: renderStep,
+    intro: 'Теперь применяем закон целиком. Выбери, чему равно выражение. Если не получается, нажми «Подсказка».' },
+];
+const S = { tab: 'train', sec: 0, idx: 0 };
+function next() { S.idx++; if (S.idx >= SECS[S.sec].tasks.length) { S.sec++; S.idx = 0; } renderTrain(); window.scrollTo(0, 0); }
+function goSec(i) { S.sec = i; S.idx = 0; renderTrain(); }
+
+function renderProgress() {
+  const bar = h('div', { class: 'progress' });
+  SECS.forEach((sec, i) => {
+    const doneN = i < S.sec ? sec.tasks.length : i === S.sec ? S.idx : 0;
+    bar.append(h('button', { class: 'seg' + (i === S.sec ? ' cur' : ''), onclick: () => goSec(i), title: 'Перейти к шагу ' + (i + 1) },
+      h('span', { class: 'seg-label' }, `${i + 1}. ${sec.title}`),
+      h('span', { class: 'seg-track' }, h('span', { class: 'seg-fill', style: `width:${100 * doneN / sec.tasks.length}%` }))));
+  });
+  return bar;
+}
+function renderTrain() {
+  const root = $('#train'); root.innerHTML = '';
+  root.append(renderProgress());
+  if (S.sec >= SECS.length) {
+    root.append(h('div', { class: 'card done-card' },
+      h('h2', {}, 'Готово!'),
+      h('p', {}, 'Теперь бери лист задач и решай уровни 0, 1 и 2 в тетради.'),
+      h('p', {}, 'Свой ответ можно проверить во вкладке «Проверь себя». Законы всегда под рукой во вкладке «Законы».'),
+      h('button', { class: 'secondary', onclick: () => goSec(0) }, 'Пройти ещё раз')));
+    return;
+  }
+  const sec = SECS[S.sec];
+  if (S.idx === 0) root.append(h('div', { class: 'intro' }, sec.intro));
+  const card = h('div', { class: 'card' },
+    h('div', { class: 'task-no' }, `Задание ${S.idx + 1} из ${sec.tasks.length}`));
+  root.append(card);
+  sec.render(sec.tasks[S.idx], card);
+}
+
+// ----- Шаг 1: порядок действий -----
+function renderOrder(task, card) {
+  const tree = parse(task), toks = tokensOf(tree);
+  const opsN = toks.filter(t => t.k === 'op').length;
+  const done = new Map();
+  const box = exprEl(toks, 'expr big');
+  const msg = h('div', { class: 'msg' }), after = h('div', { class: 'after' });
+  card.append(h('p', { class: 'q' }, 'Нажимай на знаки операций в порядке выполнения:'), box, msg, after);
+  box.querySelectorAll('.tok').forEach((sp, i) => {
+    const t = toks[i]; if (t.k !== 'op') return;
+    sp.classList.add('clickable'); sp.setAttribute('role', 'button');
+    sp.onclick = () => {
+      if (done.has(t.node)) return;
+      const err = orderCheck(t.node, done);
+      if (err) { setMsg(msg, err, 'bad'); shake(sp); return; }
+      done.set(t.node, done.size + 1);
+      sp.classList.add('done'); sp.append(h('sup', { class: 'badge' }, String(done.size)));
+      if (done.size === opsN) {
+        setMsg(msg, 'Верно! Порядок найден.', 'good');
+        after.append(h('p', {}, 'Если расставить все скобки, получится:'), exprEl(tokensOf(tree, { full: true })), nextBtn());
+      } else setMsg(msg, 'Верно, дальше.', 'good');
+    };
+  });
+}
+
+// ----- Шаг 2: что играет роль A и B -----
+function renderRole(task, card) {
+  const law = LAWS[task.law];
+  const pat = parse(law.l), tree = parse(task.expr);
+  const ranges = [], toks = tokensOf(tree, { ranges });
+  const m = match(pat, tree, {}, {});
+  const roles = [...varsOf(pat)].sort();
+  const rangeOf = n => ranges.find(r => r.node === n);
+  let ri = 0, hintLvl = 0, finished = false;
+
+  const box = exprEl(toks, 'expr big selectable');
+  const spans = [...box.querySelectorAll('.tok')];
+  const prompt = h('p', { class: 'q' });
+  const msg = h('div', { class: 'msg' }), after = h('div', { class: 'after' });
+  const hintBtn = h('button', { class: 'secondary small', onclick: hint }, 'Подсказка');
+  card.append(h('p', { class: 'q' }, `Закон ${law.name}:`), lawEl(law), prompt, box, h('div', { class: 'row' }, hintBtn), msg, after);
+
+  function updatePrompt() {
+    prompt.innerHTML = '';
+    prompt.append('Выдели в выражении то, что играет роль ', h('span', { class: 'chip c-' + roles[ri] }, roles[ri]), ':');
+  }
+  updatePrompt();
+
+  // выделение мышью / пальцем
+  let a0 = null, a1 = null, dragging = false;
+  const idxAt = (x, y) => { const el = document.elementFromPoint(x, y); const t = el && el.closest('.tok'); return t && box.contains(t) ? +t.dataset.i : null; };
+  const paintSel = () => spans.forEach((s, i) => s.classList.toggle('sel', a0 != null && i >= Math.min(a0, a1) && i <= Math.max(a0, a1)));
+  box.addEventListener('pointerdown', e => {
+    if (finished) return; const i = idxAt(e.clientX, e.clientY); if (i == null) return;
+    e.preventDefault(); dragging = true; a0 = a1 = i; paintSel();
+  });
+  window.addEventListener('pointermove', e => { if (!dragging) return; const i = idxAt(e.clientX, e.clientY); if (i != null && i !== a1) { a1 = i; paintSel(); } });
+  const up = () => { if (!dragging) return; dragging = false; const a = Math.min(a0, a1), b = Math.max(a0, a1); judge(a, b); };
+  window.addEventListener('pointerup', up); window.addEventListener('pointercancel', up);
+
+  function clearSel() { a0 = a1 = null; paintSel(); }
+  function bad(text) { setMsg(msg, text, 'bad'); shake(box); setTimeout(clearSel, 700); }
+  function judge(a, b) {
+    if (!box.isConnected || finished) return;
+    const v = roles[ri], hits = m.occ[v].map(rangeOf);
+    const eq = r => (a === r.s && b === r.e) || (a === r.ps && b === r.pe);
+    if (hits.some(eq)) {
+      clearSel(); spans.forEach(s => s.classList.remove('ghost'));
+      hits.forEach(r => { for (let i = r.ps; i <= r.pe; i++) spans[i].classList.add('c-' + v); });
+      const shown = toStr(m.bind[v]);
+      ri++; hintLvl = 0;
+      if (ri < roles.length) {
+        setMsg(msg, `Верно! Роль ${v} играет ${shown}` + (hits.length > 1 ? ' — и он встречается здесь ' + hits.length + ' раза.' : '.'), 'good');
+        updatePrompt();
+      } else finish(`Верно! Роль ${v} играет ${shown}.`);
+      return;
+    }
+    const any = ranges.find(eq);
+    if (!any) return bad('Так выделить нельзя: роль буквы играет только целое выражение — буква, отрицание вроде ¬B или скобка целиком.');
+    const other = roles.find(w => w !== v && m.occ[w].some(n => eq(rangeOf(n))));
+    if (other) return bad(`Это роль ${other}, а сейчас ищем ${v}.`);
+    if (hits.some(r => a >= r.ps && b <= r.pe)) return bad(`Мало: роль ${v} играет кусок побольше.`);
+    if (hits.some(r => a <= r.s && b >= r.e)) return bad(`Много: роль ${v} играет кусок поменьше.`);
+    bad(`Это не ${v}. Сравни выражение с законом.`);
+  }
+  function hint() {
+    if (finished) return;
+    hintLvl++;
+    const v = roles[ri], r = rangeOf(m.occ[v][0]);
+    if (hintLvl === 1) setMsg(msg, task.hint, 'hint');
+    else if (hintLvl === 2) { for (let i = r.ps; i <= r.pe; i++) spans[i].classList.add('ghost'); setMsg(msg, `Роль ${v} — то, что обведено пунктиром. Выдели это.`, 'hint'); }
+    else judge(r.ps, r.pe);
+  }
+  function finish(text) {
+    finished = true; hintBtn.remove(); prompt.remove();
+    setMsg(msg, text, 'good');
+    const colors = new Map(); roles.forEach(v => m.occ[v].forEach(n => colors.set(n, v)));
+    const res = subst(parse(law.r), m.bind);
+    after.append(h('p', {}, 'Значит, по закону:'),
+      h('div', { class: 'expr law' }, exprEl(tokensOf(tree, { colors }), 'inline'), h('span', { class: 'eq' }, '='), exprEl(tokensOf(res, { colors }), 'inline')));
+    if (task.note) after.append(h('p', { class: 'note' }, task.note));
+    after.append(nextBtn());
+  }
+}
+
+// ----- Шаг 3: один шаг преобразования -----
+function renderStep(task, card) {
+  const law = LAWS[task.law], tree = parse(task.expr);
+  const opts = task._order || (task._order = shuffle([task.ok, ...task.wrong.map(w => w[0])]));
+  const box = exprEl(tokensOf(tree), 'expr big');
+  const choices = h('div', { class: 'choices' });
+  const msg = h('div', { class: 'msg' }), after = h('div', { class: 'after' }), hintArea = h('div');
+  let hintLvl = 0, solved = false;
+  const hintBtn = h('button', { class: 'secondary small', onclick: hint }, 'Подсказка');
+  card.append(h('p', { class: 'q' }, 'Чему равно выражение?'), box, choices, h('div', { class: 'row' }, hintBtn), hintArea, msg, after);
+  const btns = opts.map(o => {
+    const b = h('button', { class: 'choice', onclick: () => pick(o, b) }, exprOf(o, 'inline'));
+    choices.append(b); return b;
+  });
+  function pick(o, b) {
+    if (solved) return;
+    if (o === task.ok) {
+      solved = true; b.classList.add('right'); btns.forEach(x => x.disabled = true); hintBtn.remove();
+      setMsg(msg, 'Верно!', 'good');
+      after.append(h('p', {}, `Это закон ${law.name}:`), lawEl(law));
+      if (task.note) after.append(h('p', { class: 'note' }, task.note));
+      after.append(nextBtn());
+    } else {
+      b.classList.add('wrong'); b.disabled = true; shake(b);
+      setMsg(msg, task.wrong.find(w => w[0] === o)[1], 'bad');
+    }
+  }
+  function hint() {
+    hintLvl++;
+    if (hintLvl === 1) { hintArea.innerHTML = ''; hintArea.append(h('p', { class: 'hintline' }, `Здесь работает закон ${law.name}.`)); }
+    else if (hintLvl === 2) {
+      hintArea.append(lawEl(law));
+      const mm = findMatch(parse(law.l), tree);
+      if (mm) {
+        const colors = new Map(); Object.keys(mm.occ).forEach(v => mm.occ[v].forEach(n => colors.set(n, v)));
+        box.replaceWith(Object.assign(exprEl(tokensOf(tree, { colors }), 'expr big'), {}));
+        hintArea.append(h('p', { class: 'hintline' }, 'Цветом показано, что в выражении играет роль букв закона.'));
+      }
+    } else { btns[opts.indexOf(task.ok)].classList.add('reveal'); hintBtn.remove(); }
+  }
+}
+
+// ----- Проверь себя -----
+function initCheck() {
+  const root = $('#check');
+  const inA = h('input', { type: 'text', class: 'in', placeholder: 'например: A ∨ ¬A ∧ B', spellcheck: 'false', autocomplete: 'off' });
+  const inB = h('input', { type: 'text', class: 'in', placeholder: 'например: A ∨ B', spellcheck: 'false', autocomplete: 'off' });
+  const errA = h('div', { class: 'err' }), errB = h('div', { class: 'err' });
+  const out = h('div');
+  let last = inA;
+  [inA, inB].forEach(i => { i.addEventListener('focus', () => last = i); i.addEventListener('keydown', e => { if (e.key === 'Enter') run(); }); });
+  const ins = s => { const i = last, p0 = i.selectionStart ?? i.value.length, p1 = i.selectionEnd ?? p0;
+    i.value = i.value.slice(0, p0) + s + i.value.slice(p1); i.focus(); i.setSelectionRange(p0 + s.length, p0 + s.length); };
+  const kb = h('div', { class: 'kb' }, ['¬', '∧', '∨', '(', ')'].map(s =>
+    h('button', { class: 'key', onmousedown: e => e.preventDefault(), onclick: () => ins(s) }, s)));
+  root.append(h('div', { class: 'card' },
+    h('p', { class: 'q' }, 'Впиши выражение из задачи и свой ответ. Компьютер проверит их по таблице истинности.'),
+    h('label', { class: 'lbl' }, 'Выражение из задачи'), inA, errA,
+    h('label', { class: 'lbl' }, 'Твой ответ'), inB, errB,
+    kb,
+    h('p', { class: 'tip' }, 'Можно печатать и с клавиатуры: ! или «не» — это ¬, & или «и» — это ∧, | или «или» — это ∨.'),
+    h('button', { class: 'primary', onclick: run }, 'Проверить'),
+    out));
+
+  function read(inp, err) {
+    err.innerHTML = '';
+    try { return parse(inp.value); }
+    catch (e) {
+      if (!(e instanceof ParseError)) throw e;
+      const s = inp.value, p = Math.min(e.pos, s.length);
+      err.append(h('div', {}, e.message), h('code', {}, s.slice(0, p), h('mark', {}, s[p] || ' '), s.slice(p + 1)));
+      return null;
+    }
+  }
+  function run() {
+    out.innerHTML = '';
+    const a = read(inA, errA), b = read(inB, errB);
+    if (!a || !b) return;
+    const r = compare(a, b);
+    out.append(h('p', { class: 'small-note' }, 'Компьютер понял так:'),
+      h('div', { class: 'expr law' }, exprEl(tokensOf(a), 'inline'), h('span', { class: 'eq' }, r.diff ? '≟' : '='), exprEl(tokensOf(b), 'inline')));
+    if (r.vars.length > 6) { out.append(h('div', { class: 'msg bad' }, 'Слишком много разных букв — используй не больше шести.')); return; }
+    if (!r.diff) out.append(h('div', { class: 'msg good' }, `Равносильно ✓ Выражения совпадают при всех ${r.rows.length} наборах значений.`));
+    else {
+      const env = r.vars.map(v => `${v} = ${r.diff.env[v]}`).join(', ');
+      out.append(h('div', { class: 'msg bad' }, `Не равносильно. Проверь при ${env}: выражение из задачи равно ${r.diff.a}, а твой ответ равен ${r.diff.b}.`));
+    }
+    const tbl = h('table', { class: 'tt' },
+      h('tr', {}, r.vars.map(v => h('th', {}, v)), h('th', {}, 'Задача'), h('th', {}, 'Ответ')),
+      r.rows.map(row => h('tr', { class: row.a !== row.b ? 'diff' : '' }, r.vars.map(v => h('td', {}, String(row.env[v]))), h('td', {}, String(row.a)), h('td', {}, String(row.b)))));
+    out.append(h('details', {}, h('summary', {}, 'Показать таблицу истинности'), tbl));
+  }
+}
+
+// ----- Законы -----
+function initLaws() {
+  const rows = [
+    ['двойного отрицания', '¬¬A = A', null],
+    ['исключённого третьего', 'A ∧ ¬A = 0', 'A ∨ ¬A = 1'],
+    ['операции с константами', 'A ∧ 1 = A,  A ∧ 0 = 0', 'A ∨ 1 = 1,  A ∨ 0 = A'],
+    ['повторения', 'A ∧ A = A', 'A ∨ A = A'],
+    ['переместительный', 'A ∧ B = B ∧ A', 'A ∨ B = B ∨ A'],
+    ['сочетательный', 'A ∧ (B ∧ C) = (A ∧ B) ∧ C', 'A ∨ (B ∨ C) = (A ∨ B) ∨ C'],
+    ['распределительный', 'A ∨ B ∧ C = (A ∨ B) ∧ (A ∨ C)', 'A ∧ (B ∨ C) = A ∧ B ∨ A ∧ C'],
+    ['поглощения', 'A ∨ A ∧ B = A', 'A ∧ (A ∨ B) = A'],
+    ['де Моргана', '¬(A ∧ B) = ¬A ∨ ¬B', '¬(A ∨ B) = ¬A ∧ ¬B'],
+  ];
+  $('#laws').append(h('div', { class: 'card' },
+    h('p', { class: 'q' }, 'Порядок операций: скобки → ¬ → ∧ → ∨'),
+    h('div', { class: 'tblwrap' }, h('table', { class: 'laws' },
+      h('tr', {}, h('th', {}, 'Закон'), h('th', {}, 'Для «И»'), h('th', {}, 'Для «ИЛИ»')),
+      rows.map(([n, a, b]) => h('tr', {}, h('td', {}, n),
+        b ? [h('td', { class: 'm' }, a), h('td', { class: 'm' }, b)] : h('td', { class: 'm', colspan: 2 }, a)))))));
+}
+
+// ----- Вкладки -----
+function setTab(t) {
+  S.tab = t;
+  document.querySelectorAll('.tab').forEach(b => b.classList.toggle('on', b.dataset.t === t));
+  document.querySelectorAll('.page').forEach(p => p.hidden = p.id !== t);
+}
+document.querySelectorAll('.tab').forEach(b => b.onclick = () => setTab(b.dataset.t));
+initCheck(); initLaws(); renderTrain(); setTab('train');
+
+</script>
+</body>
+</html>
