@@ -1,4 +1,5 @@
 <!doctype html>
+<!-- СОБРАНО АВТОМАТИЧЕСКИ из src/ командой `npm run build`. Не редактируй этот файл вручную. -->
 <html lang="ru">
 <head>
 <meta charset="utf-8">
@@ -116,6 +117,7 @@ table.laws{border-collapse:collapse;width:100%}
   <section class="page" id="laws" hidden></section>
 </main>
 <script>
+// ----- core.js -----
 // ===== Ядро: разбор, вычисление, печать, сопоставление с законом =====
 const PREC = { or: 1, and: 2, not: 3, var: 4, const: 4 };
 const SYM = { or: '∨', and: '∧', not: '¬' };
@@ -285,6 +287,13 @@ function orderCheck(n, done) {
   return 'Одинаковые операции выполняются по порядку, слева направо.';
 }
 
+// Экспорт для тестов в Node. В браузере `module` не определён, блок пропускается.
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = { ParseError, parse, ev, varsOf, equal, compare, needParens, tokensOf, toStr,
+                     match, findMatch, subst, orderCheck, isOp, PREC, SYM };
+}
+
+// ----- data.js -----
 // ===== Задания =====
 const LAWS = {
   dneg:      { name: 'двойного отрицания',      l: '¬¬A',         r: 'A' },
@@ -338,9 +347,9 @@ const STEP_TASKS = [
   { expr: 'C ∨ 0', law: 'const_or', ok: 'C', wrong: [
     ['0', 'При «ИЛИ» ноль ничего не добавляет — как прибавить 0. Результат зависит только от C.'],
     ['1', '1 получилось бы в C ∨ 1. А здесь «ИЛИ» с нулём.'] ] },
-  { expr: 'B ∧ (B ∨ C)', law: 'abs_and', ok: 'B', wrong: [
-    ['B ∨ C', 'Здесь работает закон поглощения: всё выражение равно просто B.'],
-    ['B ∧ C', 'Скобку раскрывать не нужно: по закону поглощения всё выражение равно B.'] ] },
+  { expr: 'C ∧ (C ∨ A)', law: 'abs_and', ok: 'C', wrong: [
+    ['C ∨ A', 'Здесь работает закон поглощения: всё выражение равно просто C.'],
+    ['C ∧ A', 'Скобку раскрывать не нужно: по закону поглощения всё выражение равно C.'] ] },
   { expr: '¬(A ∧ C)', law: 'dm_and', ok: '¬A ∨ ¬C', wrong: [
     ['¬A ∧ ¬C', 'Почти! При раскрытии скобки знак ∧ меняется на ∨.'],
     ['¬A ∧ C', 'Отрицание действует на обе буквы, и знак операции тоже меняется.'] ] },
@@ -358,6 +367,26 @@ const STEP_TASKS = [
     ['¬(A ∨ C) ∧ B', 'Отрицаний было два — они отменяют друг друга полностью.'] ] },
 ];
 
+// Таблица законов: вкладка «Законы» в тренажёре и dist/Законы_алгебры_логики.docx.
+// [название, для «И», для «ИЛИ»]; null во втором столбце — формула на обе колонки.
+const LAW_TABLE = [
+  ['двойного отрицания', '¬¬A = A', null],
+  ['исключённого третьего', 'A ∧ ¬A = 0', 'A ∨ ¬A = 1'],
+  ['операции с константами', 'A ∧ 1 = A,  A ∧ 0 = 0', 'A ∨ 1 = 1,  A ∨ 0 = A'],
+  ['повторения', 'A ∧ A = A', 'A ∨ A = A'],
+  ['переместительный', 'A ∧ B = B ∧ A', 'A ∨ B = B ∨ A'],
+  ['сочетательный', 'A ∧ (B ∧ C) = (A ∧ B) ∧ C', 'A ∨ (B ∨ C) = (A ∨ B) ∨ C'],
+  ['распределительный', 'A ∧ (B ∨ C) = A ∧ B ∨ A ∧ C', 'A ∨ B ∧ C = (A ∨ B) ∧ (A ∨ C)'],
+  ['поглощения', 'A ∧ (A ∨ B) = A', 'A ∨ A ∧ B = A'],
+  ['де Моргана', '¬(A ∧ B) = ¬A ∨ ¬B', '¬(A ∨ B) = ¬A ∧ ¬B'],
+];
+
+// Экспорт для тестов в Node. В браузере `module` не определён, блок пропускается.
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = { LAWS, LAW_TABLE, ORDER_TASKS, ROLE_TASKS, STEP_TASKS };
+}
+
+// ----- app.js -----
 // ===== Интерфейс =====
 const $ = (s, r = document) => r.querySelector(s);
 function h(tag, attrs, ...kids) {
@@ -413,7 +442,11 @@ function renderProgress() {
   });
   return bar;
 }
+// Обработчики на window, которые вешает текущее задание. Снимаются при каждой перерисовке.
+let taskListeners = null;
 function renderTrain() {
+  if (taskListeners) taskListeners.abort();
+  taskListeners = new AbortController();
   const root = $('#train'); root.innerHTML = '';
   root.append(renderProgress());
   if (S.sec >= SECS.length) {
@@ -488,9 +521,10 @@ function renderRole(task, card) {
     if (finished) return; const i = idxAt(e.clientX, e.clientY); if (i == null) return;
     e.preventDefault(); dragging = true; a0 = a1 = i; paintSel();
   });
-  window.addEventListener('pointermove', e => { if (!dragging) return; const i = idxAt(e.clientX, e.clientY); if (i != null && i !== a1) { a1 = i; paintSel(); } });
+  const sig = { signal: taskListeners.signal };
+  window.addEventListener('pointermove', e => { if (!dragging) return; const i = idxAt(e.clientX, e.clientY); if (i != null && i !== a1) { a1 = i; paintSel(); } }, sig);
   const up = () => { if (!dragging) return; dragging = false; const a = Math.min(a0, a1), b = Math.max(a0, a1); judge(a, b); };
-  window.addEventListener('pointerup', up); window.addEventListener('pointercancel', up);
+  window.addEventListener('pointerup', up, sig); window.addEventListener('pointercancel', up, sig);
 
   function clearSel() { a0 = a1 = null; paintSel(); }
   function bad(text) { setMsg(msg, text, 'bad'); shake(box); setTimeout(clearSel, 700); }
@@ -510,7 +544,7 @@ function renderRole(task, card) {
       return;
     }
     const any = ranges.find(eq);
-    if (!any) return bad('Так выделить нельзя: роль буквы играет только целое выражение — буква, отрицание вроде ¬B или скобка целиком.');
+    if (!any) return bad('Так выделить нельзя: роль буквы играет только целое выражение — буква, отрицание вроде ¬B, скобка или целое действие вроде B ∧ C. Помни: ∧ выполняется раньше ∨.');
     const other = roles.find(w => w !== v && m.occ[w].some(n => eq(rangeOf(n))));
     if (other) return bad(`Это роль ${other}, а сейчас ищем ${v}.`);
     if (hits.some(r => a >= r.ps && b <= r.pe)) return bad(`Мало: роль ${v} играет кусок побольше.`);
@@ -572,7 +606,7 @@ function renderStep(task, card) {
       const mm = findMatch(parse(law.l), tree);
       if (mm) {
         const colors = new Map(); Object.keys(mm.occ).forEach(v => mm.occ[v].forEach(n => colors.set(n, v)));
-        box.replaceWith(Object.assign(exprEl(tokensOf(tree, { colors }), 'expr big'), {}));
+        box.replaceWith(exprEl(tokensOf(tree, { colors }), 'expr big'));
         hintArea.append(h('p', { class: 'hintline' }, 'Цветом показано, что в выражении играет роль букв закона.'));
       }
     } else { btns[opts.indexOf(task.ok)].classList.add('reveal'); hintBtn.remove(); }
@@ -633,22 +667,11 @@ function initCheck() {
 
 // ----- Законы -----
 function initLaws() {
-  const rows = [
-    ['двойного отрицания', '¬¬A = A', null],
-    ['исключённого третьего', 'A ∧ ¬A = 0', 'A ∨ ¬A = 1'],
-    ['операции с константами', 'A ∧ 1 = A,  A ∧ 0 = 0', 'A ∨ 1 = 1,  A ∨ 0 = A'],
-    ['повторения', 'A ∧ A = A', 'A ∨ A = A'],
-    ['переместительный', 'A ∧ B = B ∧ A', 'A ∨ B = B ∨ A'],
-    ['сочетательный', 'A ∧ (B ∧ C) = (A ∧ B) ∧ C', 'A ∨ (B ∨ C) = (A ∨ B) ∨ C'],
-    ['распределительный', 'A ∨ B ∧ C = (A ∨ B) ∧ (A ∨ C)', 'A ∧ (B ∨ C) = A ∧ B ∨ A ∧ C'],
-    ['поглощения', 'A ∨ A ∧ B = A', 'A ∧ (A ∨ B) = A'],
-    ['де Моргана', '¬(A ∧ B) = ¬A ∨ ¬B', '¬(A ∨ B) = ¬A ∧ ¬B'],
-  ];
   $('#laws').append(h('div', { class: 'card' },
     h('p', { class: 'q' }, 'Порядок операций: скобки → ¬ → ∧ → ∨'),
     h('div', { class: 'tblwrap' }, h('table', { class: 'laws' },
       h('tr', {}, h('th', {}, 'Закон'), h('th', {}, 'Для «И»'), h('th', {}, 'Для «ИЛИ»')),
-      rows.map(([n, a, b]) => h('tr', {}, h('td', {}, n),
+      LAW_TABLE.map(([n, a, b]) => h('tr', {}, h('td', {}, n),
         b ? [h('td', { class: 'm' }, a), h('td', { class: 'm' }, b)] : h('td', { class: 'm', colspan: 2 }, a)))))));
 }
 
@@ -660,7 +683,6 @@ function setTab(t) {
 }
 document.querySelectorAll('.tab').forEach(b => b.onclick = () => setTab(b.dataset.t));
 initCheck(); initLaws(); renderTrain(); setTab('train');
-
 </script>
 </body>
 </html>
