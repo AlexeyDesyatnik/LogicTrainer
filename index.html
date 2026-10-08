@@ -82,6 +82,7 @@ button{font:inherit}
 .lbl{display:block;font-size:14px;color:var(--muted);margin-top:12px}
 .in{width:100%;font-family:var(--math);font-size:24px;padding:8px 12px;border:1px solid #cfccc4;border-radius:8px;margin-top:4px}
 .in:focus{outline:2px solid var(--accent);border-color:transparent}
+.in.who{font-family:inherit;font-size:20px} .in.cls{max-width:180px}
 .err{color:var(--bad);font-size:15px;margin-top:4px}
 .err code{font-family:var(--math);font-size:20px;white-space:pre}
 .err mark{background:var(--bad);color:#fff;border-radius:2px}
@@ -386,6 +387,78 @@ if (typeof module !== 'undefined' && module.exports) {
   module.exports = { LAWS, LAW_TABLE, ORDER_TASKS, ROLE_TASKS, STEP_TASKS };
 }
 
+// ----- report.js -----
+// ===== Отчёт учителю =====
+// В режиме урока тренажёр сообщает в Google-таблицу учителя, кто на каком задании, давно ли что-то делал
+// и не ушёл ли со вкладки. Это не оценка: учитель видит, кто работает, а кто нет.
+// Режим урока: задан REPORT_URL и страница открыта с ?urok в конце адреса. Иначе ничего не спрашивается
+// и не отправляется. Ответа тренажёр не ждёт: без сети он работает как обычно.
+// Приёмник — report/Code.gs, как его настроить — report/README.md.
+const REPORT_URL = 'https://script.google.com/macros/s/AKfycbz45iHIS46yX2q6HVhn06WDTLy8YXst31_wE89pSD5e8THEF6laJvKjStshFcDoQEWqjQ/exec';
+
+function lessonMode(url, search) {
+  return /^https:\/\//.test(url) && /[?&]urok(?:[=&]|$)/.test(search);
+}
+
+// Каждое сообщение — полное состояние, а не изменение: потерянное или опоздавшее сообщение ничего не портит.
+// Поля принимает clean_() в report/Code.gs; tests/report.test.js проверяет, что они совпадают.
+function reportMsg(st, ev, where, now) {
+  const sec = t => Math.max(0, Math.round((now - t) / 1000));
+  return {
+    ev, name: st.name, cls: st.cls, where, total: st.total, done: [...st.done], peek: [...st.peek],
+    idle: sec(st.lastAct), hidden: st.hiddenAt != null, away: st.hiddenAt != null ? sec(st.hiddenAt) : 0, t: now,
+  };
+}
+// Тело запроса — только латиница: русские буквы идут как \uXXXX, и никакая кодировка по дороге их не испортит
+function reportBody(msg) {
+  return JSON.stringify(msg).replace(/[^\x20-\x7e]/g, c => '\\u' + c.charCodeAt(0).toString(16).padStart(4, '0'));
+}
+
+const Report = {
+  on: typeof location !== 'undefined' && lessonMode(REPORT_URL, location.search),
+  st: null,
+  // where() описывает, где сейчас ученик: «Шаг 2, задание 3 из 7»
+  start(name, cls, total, where) {
+    const now = Date.now();
+    this.where = where;
+    this.st = { name, cls, total, done: new Set(), peek: new Set(), lastAct: now, hiddenAt: document.hidden ? now : null, t: 0 };
+    const act = () => { this.st.lastAct = Date.now(); };
+    document.addEventListener('pointerdown', act, true);
+    document.addEventListener('keydown', act, true);
+    document.addEventListener('visibilitychange', () => {
+      this.st.hiddenAt = document.hidden ? Date.now() : null;
+      this.send(document.hidden ? 'hidden' : 'visible');
+    });
+    window.addEventListener('pagehide', () => this.send('close'));
+    window.addEventListener('pageshow', e => { if (e.persisted) { this.st.hiddenAt = null; this.send('visible'); } });
+    // «Я на месте»: если сигналы пропали, значит, ноутбук закрыт или нет сети
+    setInterval(() => { if (!document.hidden) this.send('ping'); }, 60000);
+    this.send('start');
+  },
+  // Задание решено (появилась кнопка «Дальше»)
+  done(sec, idx) {
+    if (!this.st) return;
+    this.st.done.add(`${sec + 1}.${idx + 1}`); this.st.lastAct = Date.now();
+    this.send('task');
+  },
+  // Подсказка дошла до готового ответа
+  peek(sec, idx) { if (this.st) this.st.peek.add(`${sec + 1}.${idx + 1}`); },
+  send(ev) {
+    const st = this.st;
+    st.t = Math.max(Date.now(), st.t + 1); // время только растёт: по нему таблица отбрасывает опоздавшие сообщения
+    const body = reportBody(reportMsg(st, ev, this.where(), st.t));
+    try {
+      if (!navigator.sendBeacon(REPORT_URL, body))
+        fetch(REPORT_URL, { method: 'POST', mode: 'no-cors', keepalive: true, body }).catch(() => {});
+    } catch (e) { /* без сети тренажёр работает как обычно */ }
+  },
+};
+
+// Экспорт для тестов в Node. В браузере `module` не определён, блок пропускается.
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = { REPORT_URL, lessonMode, reportMsg, reportBody };
+}
+
 // ----- app.js -----
 // ===== Интерфейс =====
 const $ = (s, r = document) => r.querySelector(s);
@@ -416,7 +489,11 @@ function lawEl(law, cls = 'expr law') {
 }
 function setMsg(el, text, kind) { el.className = 'msg ' + (kind || ''); el.textContent = text; }
 function shake(el) { el.classList.remove('shake'); void el.offsetWidth; el.classList.add('shake'); }
-const nextBtn = () => { const b = h('button', { class: 'primary', onclick: next }, 'Дальше →'); setTimeout(() => b.focus(), 0); return b; };
+// Кнопка «Дальше» появляется, когда задание решено
+const nextBtn = () => {
+  Report.done(S.sec, S.idx);
+  const b = h('button', { class: 'primary', onclick: next }, 'Дальше →'); setTimeout(() => b.focus(), 0); return b;
+};
 function shuffle(a) { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
 
 // ----- Состояние и навигация -----
@@ -429,6 +506,7 @@ const SECS = [
     intro: 'Теперь применяем закон целиком. Выбери, чему равно выражение. Если не получается, нажми «Подсказка».' },
 ];
 const S = { tab: 'train', sec: 0, idx: 0 };
+const TOTAL = SECS.reduce((n, sec) => n + sec.tasks.length, 0);
 function next() { S.idx++; if (S.idx >= SECS[S.sec].tasks.length) { S.sec++; S.idx = 0; } renderTrain(); window.scrollTo(0, 0); }
 function goSec(i) { S.sec = i; S.idx = 0; renderTrain(); }
 
@@ -448,6 +526,7 @@ function renderTrain() {
   if (taskListeners) taskListeners.abort();
   taskListeners = new AbortController();
   const root = $('#train'); root.innerHTML = '';
+  if (Report.on && !Report.st) { root.append(renderWho()); return; }
   root.append(renderProgress());
   if (S.sec >= SECS.length) {
     root.append(h('div', { class: 'card done-card' },
@@ -463,6 +542,34 @@ function renderTrain() {
     h('div', { class: 'task-no' }, `Задание ${S.idx + 1} из ${sec.tasks.length}`));
   root.append(card);
   sec.render(sec.tasks[S.idx], card);
+}
+
+// ----- Режим урока: кто ты (см. src/report.js) -----
+function renderWho() {
+  const name = h('input', { type: 'text', class: 'in who', maxlength: 60, autocomplete: 'off', spellcheck: 'false' });
+  const cls = h('input', { type: 'text', class: 'in who cls', maxlength: 10, placeholder: 'например: 8Б', autocomplete: 'off', spellcheck: 'false' });
+  const msg = h('div', { class: 'msg' });
+  function go() {
+    const n = name.value.replace(/\s+/g, ' ').trim(), c = cls.value.trim();
+    if (n.split(' ').length < 2) { setMsg(msg, 'Напиши фамилию и имя.', 'bad'); name.focus(); return; }
+    if (!c) { setMsg(msg, 'Напиши свой класс, например 8Б.', 'bad'); cls.focus(); return; }
+    Report.start(n, c, TOTAL, whereNow);
+    renderTrain();
+  }
+  [name, cls].forEach(i => i.addEventListener('keydown', e => { if (e.key === 'Enter') go(); }));
+  setTimeout(() => name.focus(), 0);
+  return h('div', { class: 'card' },
+    h('p', { class: 'q' }, 'Перед началом напиши, кто ты.'),
+    h('label', { class: 'lbl' }, 'Фамилия и имя'), name,
+    h('label', { class: 'lbl' }, 'Класс'), cls,
+    msg,
+    h('p', { class: 'tip' }, 'Учитель видит, на каком ты задании.'),
+    h('button', { class: 'primary', onclick: go }, 'Начать'));
+}
+// Для таблицы учителя: «Шаг 2, задание 3 из 7» или «Готово», и открытая вкладка, если это не тренажёр
+function whereNow() {
+  const pos = S.sec >= SECS.length ? 'Готово' : `Шаг ${S.sec + 1}, задание ${S.idx + 1} из ${SECS[S.sec].tasks.length}`;
+  return S.tab === 'train' ? pos : `${pos} (вкладка «${$(`.tab[data-t=${S.tab}]`).textContent}»)`;
 }
 
 // ----- Шаг 1: порядок действий -----
@@ -557,7 +664,7 @@ function renderRole(task, card) {
     const v = roles[ri], r = rangeOf(m.occ[v][0]);
     if (hintLvl === 1) setMsg(msg, task.hint, 'hint');
     else if (hintLvl === 2) { for (let i = r.ps; i <= r.pe; i++) spans[i].classList.add('ghost'); setMsg(msg, `Роль ${v} — то, что обведено пунктиром. Выдели это.`, 'hint'); }
-    else judge(r.ps, r.pe);
+    else { Report.peek(S.sec, S.idx); judge(r.ps, r.pe); }
   }
   function finish(text) {
     finished = true; hintBtn.remove(); prompt.remove();
@@ -609,7 +716,7 @@ function renderStep(task, card) {
         box.replaceWith(exprEl(tokensOf(tree, { colors }), 'expr big'));
         hintArea.append(h('p', { class: 'hintline' }, 'Цветом показано, что в выражении играет роль букв закона.'));
       }
-    } else { btns[opts.indexOf(task.ok)].classList.add('reveal'); hintBtn.remove(); }
+    } else { Report.peek(S.sec, S.idx); btns[opts.indexOf(task.ok)].classList.add('reveal'); hintBtn.remove(); }
   }
 }
 
