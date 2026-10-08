@@ -447,9 +447,10 @@ const Report = {
     const st = this.st;
     st.t = Math.max(Date.now(), st.t + 1); // время только растёт: по нему таблица отбрасывает опоздавшие сообщения
     const body = reportBody(reportMsg(st, ev, this.where(), st.t));
+    // Не sendBeacon: его запросы блокировщики рекламы режут как «ping», и он шлёт cookie Google,
+    // а вошедшему в несколько аккаунтов Google скрипт таблицы может отказать. keepalive — доходит и при закрытии вкладки.
     try {
-      if (!navigator.sendBeacon(REPORT_URL, body))
-        fetch(REPORT_URL, { method: 'POST', mode: 'no-cors', keepalive: true, body }).catch(() => {});
+      fetch(REPORT_URL, { method: 'POST', mode: 'no-cors', credentials: 'omit', keepalive: true, body }).catch(() => {});
     } catch (e) { /* без сети тренажёр работает как обычно */ }
   },
 };
